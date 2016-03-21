@@ -2,17 +2,14 @@ package com.iflytek.voicedemo;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-
-import javax.security.auth.PrivateCredentialPermission;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import android.R.string;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Intent;
@@ -29,25 +26,20 @@ import android.view.Window;
 import android.widget.EditText;
 import android.widget.Toast;
 import com.FT312D.utility.FT311UARTInterface;
-import com.fan.util.ParseJson;
 import com.iflytek.cloud.ErrorCode;
 import com.iflytek.cloud.InitListener;
+import com.iflytek.cloud.RecognizerListener;
 import com.iflytek.cloud.RecognizerResult;
 import com.iflytek.cloud.SpeechConstant;
 import com.iflytek.cloud.SpeechError;
+import com.iflytek.cloud.SpeechRecognizer;
 import com.iflytek.cloud.SpeechSynthesizer;
 import com.iflytek.cloud.SpeechUnderstander;
 import com.iflytek.cloud.SpeechUnderstanderListener;
-import com.iflytek.cloud.SpeechUtility;
 import com.iflytek.cloud.SynthesizerListener;
 import com.iflytek.cloud.TextUnderstander;
 import com.iflytek.cloud.TextUnderstanderListener;
 import com.iflytek.cloud.UnderstanderResult;
-import com.iflytek.cloud.VoiceWakeuper;
-import com.iflytek.cloud.WakeuperListener;
-import com.iflytek.cloud.WakeuperResult;
-import com.iflytek.cloud.util.ResourceUtil;
-import com.iflytek.cloud.util.ResourceUtil.RESOURCE_TYPE;
 import com.iflytek.speech.setting.IatSettings;
 import com.iflytek.speech.util.JsonParser;
 import com.iflytek.sunflower.FlowerCollector;
@@ -70,6 +62,9 @@ public class IatDemo extends Activity implements OnClickListener {
 	
 	// 语义理解对象（文本到语义）。
 	private TextUnderstander   mTextUnderstander;
+	
+	// 语音听写对象
+	private SpeechRecognizer mIat;
 	
 	//用于语音合成  add by Frank
 	private SpeechSynthesizer mTts;
@@ -119,25 +114,23 @@ public class IatDemo extends Activity implements OnClickListener {
 	
 	//语音唤醒
 	// 语音唤醒对象
-	private VoiceWakeuper mIvw;
-	// 唤醒结果内容
-	private String resultString;
-	// 设置门限值 ： 门限值越低越容易被唤醒
-	private final static int MIN = -20;
-	private int curThresh = MIN;
+//	private VoiceWakeuper mIvw;
+//	// 唤醒结果内容
+//	private String resultString;
+//	// 设置门限值 ： 门限值越低越容易被唤醒
+//	private final static int MIN = -20;
+//	private int curThresh = MIN;
 	
 	
-	private String globalAnswerText;
-	
-	private boolean globalCompletedFlag = false;
-	
-	private boolean globalTFlag = true;
+
 	
 	private static final int PROCESSING = 1;
 	
-	private static String answerString = null;
+	private static String iatString;
+	private static String understandString;
+	private Boolean speechFlag = false;
 	
-	private Boolean answerFlag = false;
+	private StringBuffer resultBuffer;
 	
 	
 	
@@ -152,6 +145,9 @@ public class IatDemo extends Activity implements OnClickListener {
 		// 初始化语音合成对象
 		mTts = SpeechSynthesizer.createSynthesizer(IatDemo.this, mTtsInitListener);
 		
+		// 初始化识别无UI识别对象
+		// 使用SpeechRecognizer对象，可根据回调消息自定义界面；
+		mIat = SpeechRecognizer.createRecognizer(this, mInitListener);
 		
 		/**
 		 * 申请的appid时，我们为开发者开通了开放语义（语义理解）
@@ -178,6 +174,44 @@ public class IatDemo extends Activity implements OnClickListener {
 //		setWeakupParam();
 		
 		player = new Player();
+		
+		
+//		new Thread(new Runnable() {
+//			
+//			@Override
+//			public void run() {
+//				// TODO Auto-generated method stub
+//				
+//				while(true){
+//					if (onResulttext != null) {
+//						String regEx="[^0-9]";   
+//						Pattern p = Pattern.compile(regEx);   
+//						Matcher m = p.matcher(onResulttext);   
+//						iatString = m.replaceAll("").trim();
+//						mResultText.append(understandString+"\n");
+//						//定位光标到句尾
+//						mResultText.append(onResulttext+"\n");
+//						mResultText.append(iatString+"\n");
+//						if ((iatString != null) && (understandString != null)) {
+//							if (iatString.equals(understandString)) {
+//								
+//								speechFlag = false;
+//								mTts.startSpeaking("答对了！", mTtsListener);
+////								mResultText.append("Right!");
+////								
+//							}else {
+//								mResultText.append(understandString+"\n");
+//								mResultText.append(iatString+"\n");
+//								speechFlag = false;
+//								mTts.startSpeaking("答错了！", mTtsListener);
+//							}
+//						}
+//					}
+//					
+//				}
+//				
+//			}
+//		}).start();
 		
 		
 	}
@@ -294,7 +328,19 @@ public class IatDemo extends Activity implements OnClickListener {
 		}
 	}
 
-	
+	/**
+	 * 初始化语音识别监听器。
+	 */
+	private InitListener mInitListener = new InitListener() {
+
+		@Override
+		public void onInit(int code) {
+			Log.d(TAG, "SpeechRecognizer init() code = " + code);
+			if (code != ErrorCode.SUCCESS) {
+				showTip("初始化失败，错误码：" + code);
+			}
+		}
+	};
 	
 	
 	
@@ -355,7 +401,7 @@ public class IatDemo extends Activity implements OnClickListener {
 
 		private String urlString;
 		private String text;
-		private String aaaa = null;
+		
 		
 
 		@SuppressLint("NewApi")
@@ -375,7 +421,7 @@ public class IatDemo extends Activity implements OnClickListener {
 //			}
 			
 			/*
-			 * 解析Json
+			 * 解析Json字符串
 			 * 
 			 */
 			if (null != UdrResult) {
@@ -384,37 +430,62 @@ public class IatDemo extends Activity implements OnClickListener {
 				// 显示
 				final String jsonString = UdrResult.getResultString();
 				
-				mResultText.setText(jsonString);
+//				mResultText.setText(jsonString);
+				
 				try {
 					JSONObject root = new JSONObject(jsonString);
-					text  = root.getString("text");
-					aaaa = text.substring(2,3);
-					mResultText.setText(aaaa);
-					JSONObject answerTextJsonObject = root.getJSONObject("answer");
-					globalAnswerText = answerTextJsonObject.getString("text");
-	
-//					mResultText.setText(text);
-					JSONObject data = root.getJSONObject("data");
-					JSONArray result = data.getJSONArray("result");
-					JSONObject url = result.getJSONObject(0);
-					urlString = url.getString("downloadUrl");
 					
-					
-					
-					
-					if (!TextUtils.isEmpty(urlString)) {
-						lastResultJsonString = jsonString;
-						i = 1;
-						new Thread(new Runnable() {
-
-							@Override
-							public void run() {
-									
-								player.playUrl(urlString);
-								
+					int rc = root.getInt("rc");
+					if(0 == rc){
+						
+//						String service = root.getString("service");
+						JSONObject answer = root.getJSONObject("answer");
+						String textString = answer.getString("text");
+						
+						if(mTextUnderstander.isUnderstanding()){
+							mTextUnderstander.cancel();
+							showTip("取消");
+						}else {
+							ret = mTextUnderstander.understandText(textString, textListener);
+							if(ret != 0)
+							{
+								showTip("语义理解失败,错误码:"+ ret);
 							}
-						}).start();
+						}
+						
+						mResultText.setText(textString);
+						
+						setTtsParam();
+						mTts.startSpeaking(textString, mTtsListener);
+						speechFlag = true;
+						
+					}else{
+						return ;
 					}
+					
+					
+
+					
+					
+							
+//					JSONObject data = root.getJSONObject("data");
+//					JSONArray result = data.getJSONArray("result");
+//					JSONObject url = result.getJSONObject(0);
+//					urlString = url.getString("downloadUrl");
+					
+//					if (!TextUtils.isEmpty(urlString)) {
+//						lastResultJsonString = jsonString;
+//						i = 1;
+//						new Thread(new Runnable() {
+//
+//							@Override
+//							public void run() {
+//									
+//								player.playUrl(urlString);
+//								
+//							}
+//						}).start();
+//					}
 					
 				} catch (JSONException e) {
 					// TODO Auto-generated catch block
@@ -423,45 +494,45 @@ public class IatDemo extends Activity implements OnClickListener {
 				
 				
 
-				if (!TextUtils.isEmpty(text) && "暂停播放。".equals(text)) {
-					millisecond = player.getCurrentPosition();
-					player.pause();
-					mResultText.setText(text);		
-				}else if (!TextUtils.isEmpty(text) && "继续播放。".equals(text)) {
-					player.seekTo(millisecond);
-					player.play();
-				}else if ("换一首。".equals(text)) {
-					
-					mResultText.setText(text);
-					try {
-						JSONObject root1 = new JSONObject(lastResultJsonString);
-						
-						JSONObject data1 = root1.getJSONObject("data");
-						JSONArray result1 = data1.getJSONArray("result");
-						JSONObject url1 = result1.getJSONObject(i++);
-						urlString = url1.getString("downloadUrl");
-						mResultText.setText(urlString);
-						
-
-							
-					} catch (JSONException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					
-					if (!TextUtils.isEmpty(urlString)) {
-						
-						new Thread(new Runnable() {
-
-							@Override
-							public void run() {
-									
-								player.playUrl(urlString);
-								
-							}
-						}).start();
-					}
-				}
+//				if (!TextUtils.isEmpty(text) && "暂停播放。".equals(text)) {
+//					millisecond = player.getCurrentPosition();
+//					player.pause();
+//					mResultText.setText(text);		
+//				}else if (!TextUtils.isEmpty(text) && "继续播放。".equals(text)) {
+//					player.seekTo(millisecond);
+//					player.play();
+//				}else if ("换一首。".equals(text)) {
+//					
+//					mResultText.setText(text);
+//					try {
+//						JSONObject root1 = new JSONObject(lastResultJsonString);
+//						
+//						JSONObject data1 = root1.getJSONObject("data");
+//						JSONArray result1 = data1.getJSONArray("result");
+//						JSONObject url1 = result1.getJSONObject(i++);
+//						urlString = url1.getString("downloadUrl");
+//						mResultText.setText(urlString);
+//						
+//
+//							
+//					} catch (JSONException e) {
+//						// TODO Auto-generated catch block
+//						e.printStackTrace();
+//					}
+//					
+//					if (!TextUtils.isEmpty(urlString)) {
+//						
+//						new Thread(new Runnable() {
+//
+//							@Override
+//							public void run() {
+//									
+//								player.playUrl(urlString);
+//								
+//							}
+//						}).start();
+//					}
+//				}
 			} else {
 				showTip("识别结果不正确。");
 			}	
@@ -477,18 +548,7 @@ public class IatDemo extends Activity implements OnClickListener {
 		@Override
         public void onEndOfSpeech() {
         	// 此回调表示：检测到了语音的尾端点，已经进入识别过程，不再接受语音输入
-        	showTip("结束说话");
-        	
-//        	if(answerFlag){
-//        		if (answerString.equals(aaaa)) {
-//    				mTts.startSpeaking("答对了！", mTtsListener);
-//    			}
-//        	}
-        	
-        		
-        	
-        	
-			
+        	showTip("结束说话");	
         }
         
         @Override
@@ -524,67 +584,42 @@ public class IatDemo extends Activity implements OnClickListener {
 		}
     };
 
-    
-private TextUnderstanderListener textListener = new TextUnderstanderListener() {
+    /*
+     * 文本理解回调
+     */
+    private TextUnderstanderListener textListener = new TextUnderstanderListener() {
 		
-		private String answerText;
 		@Override
 		public void onResult(final UnderstanderResult result) {
 	       	runOnUiThread(new Runnable() {
-					
-
 					@Override
 					public void run() {
 						if (null != result) {
 			            	// 显示
 							Log.d(TAG, "understander result：" + result.getResultString());
-							String text = result.getResultString();
+							final String text = result.getResultString();
 							if (!TextUtils.isEmpty(text)) {
-//								mUnderstanderText.setText(text);
 								
+								try {
+									JSONObject root = new JSONObject(text);
+									JSONObject answer = root.getJSONObject("answer");
+									String textString = answer.getString("text");
 									
-									try {
-										JSONObject root = new JSONObject(text);
-//										text  = root.getString("text");
-										JSONObject answerTextJsonObject = root.getJSONObject("answer");
-										answerText = answerTextJsonObject.getString("text");
-										
-										//获取到答案
-										answerString = answerText.substring(2);
-										
-										
-									} catch (JSONException e) {
-										// TODO Auto-generated catch block
-										e.printStackTrace();
-									}
+									String regEx="[^0-9]";   
+									Pattern p = Pattern.compile(regEx);   
+									Matcher m = p.matcher(textString);   
+									understandString = m.replaceAll("").trim();
 									
-//									new Thread(new Runnable() {
-//
-//										@Override
-//										public void run() {
-//												
-//											while (globalTFlag) {
-//												if (globalCompletedFlag) {
-//													globalTFlag = false;
-//													globalCompletedFlag = false;
-//													
-//													String aString = answerText.substring(2);
-//													Message msg = new Message();
-//													msg.what = PROCESSING;
-//													msg.getData().putString("answer", aString);
-//													handler.sendMessage(msg);
-//													if("2".equals(aString))
-//													{
-//														setTtsParam();
-//														mTts.startSpeaking("答对了！", mTtsListener);
-//													}
-//													
-//												}
-//												
-//											}
-//											
-//										}
-//									}).start();
+//									understandString = textString.substring(2);
+//									mResultText.append(understandString);
+//									//定位光标到句尾
+//									mResultText.setSelection(mResultText.length());
+								} catch (JSONException e) {
+									// TODO Auto-generated catch block
+									e.printStackTrace();
+								}
+								
+								
 							}
 			            } else {
 			                Log.d(TAG, "understander result:null");
@@ -599,6 +634,109 @@ private TextUnderstanderListener textListener = new TextUnderstanderListener() {
 			// 文本语义不能使用回调错误码14002，请确认您下载sdk时是否勾选语义场景和私有语义的发布
 			showTip("onError Code："	+ error.getErrorCode());
 			
+		}
+	};
+    
+    
+    /**
+	 * 听写监听器。
+	 */
+	private RecognizerListener mRecognizerListener = new RecognizerListener() {
+
+		
+
+		
+
+		@Override
+		public void onBeginOfSpeech() {
+			// 此回调表示：sdk内部录音机已经准备好了，用户可以开始语音输入
+			showTip("开始说话");
+		}
+
+		@Override
+		public void onError(SpeechError error) {
+			// Tips：
+			// 错误码：10118(您没有说话)，可能是录音机权限被禁，需要提示用户打开应用的录音权限。
+			showTip(error.getPlainDescription(true));
+		}
+
+		@Override
+		public void onEndOfSpeech() {
+			// 此回调表示：检测到了语音的尾端点，已经进入识别过程，不再接受语音输入
+			showTip("结束说话");
+			mIat.stopListening();
+		}
+
+		@Override
+		public void onResult(RecognizerResult results, boolean isLast) {		
+			String text = JsonParser.parseIatResult(results.getResultString());
+			String sn = null;
+			
+			// 读取json结果中的sn字段
+			try {
+				JSONObject resultJson = new JSONObject(results.getResultString());
+				sn = resultJson.optString("sn");
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+			
+			mIatResults.put(sn, text);
+
+			
+			resultBuffer = new StringBuffer();
+			for (String key : mIatResults.keySet()) {
+				resultBuffer.append(mIatResults.get(key));
+			}
+			
+			if(isLast) {
+				
+				
+
+				String resultString = resultBuffer.toString();
+						
+				mResultText.append(resultString+"\n");
+				
+				mResultText.append(understandString+"\n");
+				
+				String regEx="[^0-9]";   
+				Pattern p = Pattern.compile(regEx);   
+				Matcher m = p.matcher(resultString);   
+				iatString = m.replaceAll("").trim();
+				
+				mResultText.append(iatString+"\n");
+				
+				
+				if ((iatString != null) && (understandString != null)) {
+					if (iatString.equals(understandString)) {
+						
+						speechFlag = false;
+						mTts.startSpeaking("答对了！", mTtsListener);
+//						mResultText.append("Right!");
+//						
+					}else {
+						mResultText.append(understandString+"\n");
+						mResultText.append(iatString+"\n");
+						speechFlag = false;
+						mTts.startSpeaking("答错了！", mTtsListener);
+					}
+				}
+			}
+		}
+
+		@Override
+		public void onVolumeChanged(int volume, byte[] data) {
+			showTip("当前正在说话，音量大小：" + volume);
+			Log.d(TAG, "返回音频数据："+data.length);
+		}
+
+		@Override
+		public void onEvent(int eventType, int arg1, int arg2, Bundle obj) {
+			// 以下代码用于获取与云端的会话id，当业务出错时将会话id提供给技术支持人员，可用于查询会话日志，定位出错原因
+			// 若使用本地能力，会话id为null
+			//	if (SpeechEvent.EVENT_SESSION_ID == eventType) {
+			//		String sid = obj.getString(SpeechEvent.KEY_EVENT_SESSION_ID);
+			//		Log.d(TAG, "session id =" + sid);
+			//	}
 		}
 	};
     
@@ -844,7 +982,20 @@ private TextUnderstanderListener textListener = new TextUnderstanderListener() {
 		public void onCompleted(SpeechError error) {
 			if (error == null) {
 				showTip("播放完成");
-				globalCompletedFlag = true;
+				if (speechFlag) {
+					
+					//停止语义理解，让出MIC
+					mSpeechUnderstander.stopUnderstanding();
+					
+					// 开始语音识
+					ret = mIat.startListening(mRecognizerListener);
+					if (ret != ErrorCode.SUCCESS) {
+						showTip("听写失败,错误码：" + ret);
+					} else {
+						showTip(getString(R.string.text_begin));
+					}
+				}
+				
 			} else if (error != null) {
 				showTip(error.getPlainDescription(true));
 			}
