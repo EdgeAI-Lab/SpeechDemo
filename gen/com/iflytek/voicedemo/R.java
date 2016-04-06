@@ -72,11 +72,9 @@ public final class R {
         public static final int stop=0x7f020009;
     }
     public static final class id {
-        public static final int bConnect=0x7f0a0023;
         public static final int btn=0x7f0a0020;
         public static final int button_cancel=0x7f0a0004;
         public static final int button_scan=0x7f0a0003;
-        public static final int edit_text=0x7f0a0021;
         public static final int iat_cancel=0x7f0a0009;
         public static final int iat_recognize=0x7f0a0007;
         public static final int iat_stop=0x7f0a0008;
@@ -85,8 +83,8 @@ public final class R {
         public static final int iat_upload_userwords=0x7f0a000f;
         public static final int image_iat_set=0x7f0a0005;
         public static final int image_ise_set=0x7f0a0010;
-        public static final int image_tts_set=0x7f0a0024;
-        public static final int image_understander_set=0x7f0a002f;
+        public static final int image_tts_set=0x7f0a0021;
+        public static final int image_understander_set=0x7f0a002c;
         public static final int ise_cancel=0x7f0a0015;
         public static final int ise_eva_text=0x7f0a0011;
         public static final int ise_parse=0x7f0a0016;
@@ -99,7 +97,6 @@ public final class R {
         public static final int isr_recognize=0x7f0a001d;
         public static final int isr_stop=0x7f0a001e;
         public static final int isr_text=0x7f0a0017;
-        public static final int listview_main=0x7f0a0022;
         public static final int new_devices=0x7f0a0002;
         public static final int paired_devices=0x7f0a0000;
         public static final int pause=0x7f0a000c;
@@ -108,22 +105,22 @@ public final class R {
         public static final int radioLocal=0x7f0a001a;
         public static final int resume=0x7f0a000a;
         public static final int start=0x7f0a000b;
-        public static final int start_understander=0x7f0a0032;
-        public static final int text_understander=0x7f0a0031;
+        public static final int start_understander=0x7f0a002f;
+        public static final int text_understander=0x7f0a002e;
         public static final int title_new_devices=0x7f0a0001;
-        public static final int tts_btn_emot_select=0x7f0a002a;
-        public static final int tts_btn_person_select=0x7f0a0029;
-        public static final int tts_cancel=0x7f0a002c;
-        public static final int tts_pause=0x7f0a002d;
-        public static final int tts_play=0x7f0a002b;
-        public static final int tts_radioCloud=0x7f0a0027;
-        public static final int tts_radioLocal=0x7f0a0028;
-        public static final int tts_rediogroup=0x7f0a0026;
-        public static final int tts_resume=0x7f0a002e;
-        public static final int tts_text=0x7f0a0025;
-        public static final int understander_cancel=0x7f0a0034;
-        public static final int understander_stop=0x7f0a0033;
-        public static final int understander_text=0x7f0a0030;
+        public static final int tts_btn_emot_select=0x7f0a0027;
+        public static final int tts_btn_person_select=0x7f0a0026;
+        public static final int tts_cancel=0x7f0a0029;
+        public static final int tts_pause=0x7f0a002a;
+        public static final int tts_play=0x7f0a0028;
+        public static final int tts_radioCloud=0x7f0a0024;
+        public static final int tts_radioLocal=0x7f0a0025;
+        public static final int tts_rediogroup=0x7f0a0023;
+        public static final int tts_resume=0x7f0a002b;
+        public static final int tts_text=0x7f0a0022;
+        public static final int understander_cancel=0x7f0a0031;
+        public static final int understander_stop=0x7f0a0030;
+        public static final int understander_text=0x7f0a002d;
         public static final int write=0x7f0a000e;
     }
     public static final class layout {

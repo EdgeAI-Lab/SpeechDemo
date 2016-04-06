@@ -191,6 +191,18 @@ public class FT311UARTInterface extends Activity
 			e.printStackTrace();
 		}
 	}
+	
+	/*method to send on USB*/
+	public void SendOneByte(byte value)
+	{	
+		try {
+			if(outputstream != null){
+				outputstream.write(value);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	/*resume accessory*/
 	public int ResumeAccessory()

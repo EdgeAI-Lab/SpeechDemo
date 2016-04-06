@@ -5,35 +5,105 @@
     android:background="@drawable/layout_backgroud"
     android:orientation="vertical" >
 
-    <include layout="@layout/title" />
-
-    <TextView
-        android:id="@+id/edit_text"
+    <TextView 
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginLeft="@dimen/margin_"
-        android:layout_marginRight="@dimen/margin_"
-        android:text="@string/example_explain"
-        android:textSize="@dimen/txt_size" />
-
-    <ListView
-        android:id="@+id/listview_main"
+        android:gravity="center"
+        android:textSize="30sp"
+        android:textStyle="bold"
+        android:text="幼师助教示例软件"/>
+    
+    <TextView 
         android:layout_width="match_parent"
-        android:layout_height="272dp"
-        android:layout_marginLeft="5dp"
-        android:layout_marginRight="5dp"
-        android:layout_marginTop="10dp"
-        android:layout_weight="0.46"
-        android:cacheColorHint="@color/white"
-        android:divider="@drawable/line_background"
-        android:dividerHeight="@dimen/line_height"
-        android:paddingBottom="5dp" />
-
-    <Button
-        android:id="@+id/bConnect"
+        android:layout_height="wrap_content"
+        android:text="本示例为英博锐幼教机器人，语音交互系统应用程序。详细功能请试用了解。"/>
+    
+    
+   <EditText
+        android:id="@+id/iat_text"
         android:layout_width="match_parent"
-        android:layout_height="45dp"
-        android:text="连接蓝牙" 
-        android:onClick="onConnectButtonClicked"/>
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="top|left"
+        android:paddingBottom="20dp"
+        android:textSize="20sp" />
+   
+   <TableLayout 
+       android:layout_width="match_parent"
+       android:layout_height="wrap_content">
+       
+       <TableRow 
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content">
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+       </TableRow>
+       
+       <TableRow 
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content">
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+       </TableRow>
+       
+       <TableRow 
+           android:layout_width="match_parent"
+           android:layout_height="wrap_content">
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+           <Button 
+               android:layout_width="0dp"
+               android:layout_height="wrap_content"
+               android:layout_weight="1"
+               android:text="button"/>
+           
+       </TableRow>
+       
+   </TableLayout>
 
 </LinearLayout>

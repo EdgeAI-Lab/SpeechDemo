@@ -1,7 +1,5 @@
 package com.iflytek.voicedemo;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.regex.Matcher;
@@ -26,6 +24,8 @@ import android.view.Window;
 import android.widget.EditText;
 import android.widget.Toast;
 import com.FT312D.utility.FT311UARTInterface;
+import com.fan.util.RollCall;
+import com.fan.util.ServerThread;
 import com.iflytek.cloud.ErrorCode;
 import com.iflytek.cloud.InitListener;
 import com.iflytek.cloud.RecognizerListener;
@@ -97,7 +97,7 @@ public class IatDemo extends Activity implements OnClickListener {
 	/* thread to read the data */
 	public handler_thread handlerThread;
 
-	/* declare a FT311 UART interface variable */
+	/* declare a FT312D UART interface variable */
 	public FT311UARTInterface uartInterface;
 	
 	private static boolean allowSpeechFalg = false;
@@ -111,20 +111,13 @@ public class IatDemo extends Activity implements OnClickListener {
 	
 	private static String lastResultJsonString;
 	
-	
-	//语音唤醒
-	// 语音唤醒对象
-//	private VoiceWakeuper mIvw;
-//	// 唤醒结果内容
-//	private String resultString;
-//	// 设置门限值 ： 门限值越低越容易被唤醒
-//	private final static int MIN = -20;
-//	private int curThresh = MIN;
+
 	
 	
 
 	
 	private static final int PROCESSING = 1;
+	private static final int FT312D = 2;
 	
 	private static String iatString;
 	private static String understandString;
@@ -132,6 +125,7 @@ public class IatDemo extends Activity implements OnClickListener {
 	
 	private StringBuffer resultBuffer;
 	
+	private boolean nextQuestionFlag;
 	
 	
 	@SuppressLint("ShowToast")
@@ -166,6 +160,9 @@ public class IatDemo extends Activity implements OnClickListener {
 		// 设置语义理解参数
 		setUnderstanderParam();
 		
+		// 设置语音合成参数
+		setTtsParam();
+		
 		/*
 		 * 设置语音唤醒参数（试用期已过）
 		 * 代码已经写好，购买唤醒词之后，将对应的唤醒资源Copy到本工程后，即可使用唤醒功能
@@ -175,43 +172,18 @@ public class IatDemo extends Activity implements OnClickListener {
 		
 		player = new Player();
 		
-		
+//		if(player == null){
+//			player = new Player();
+//		}
 //		new Thread(new Runnable() {
-//			
+//
 //			@Override
 //			public void run() {
-//				// TODO Auto-generated method stub
-//				
-//				while(true){
-//					if (onResulttext != null) {
-//						String regEx="[^0-9]";   
-//						Pattern p = Pattern.compile(regEx);   
-//						Matcher m = p.matcher(onResulttext);   
-//						iatString = m.replaceAll("").trim();
-//						mResultText.append(understandString+"\n");
-//						//定位光标到句尾
-//						mResultText.append(onResulttext+"\n");
-//						mResultText.append(iatString+"\n");
-//						if ((iatString != null) && (understandString != null)) {
-//							if (iatString.equals(understandString)) {
-//								
-//								speechFlag = false;
-//								mTts.startSpeaking("答对了！", mTtsListener);
-////								mResultText.append("Right!");
-////								
-//							}else {
-//								mResultText.append(understandString+"\n");
-//								mResultText.append(iatString+"\n");
-//								speechFlag = false;
-//								mTts.startSpeaking("答错了！", mTtsListener);
-//							}
-//						}
-//					}
-//					
-//				}
-//				
+//				player.playUrl("http://192.168.1.102:8080/music/开机问候语.mp3");
 //			}
 //		}).start();
+		
+//        new ServerThread().start();
 		
 		
 	}
@@ -293,16 +265,7 @@ public class IatDemo extends Activity implements OnClickListener {
 			
 		case R.id.start:
 			showTip("开始播放");
-			if(player == null){
-				player = new Player();
-			}
-			new Thread(new Runnable() {
-
-				@Override
-				public void run() {
-					player.playUrl("http://abv.cn/music/光辉岁月.mp3");
-				}
-			}).start();
+			mIat.startListening(mRecognizerListener);
 			break;
 			
 		case R.id.pause:
@@ -320,8 +283,8 @@ public class IatDemo extends Activity implements OnClickListener {
 			break;
 					
 		case R.id.write:
-//			writeData("123");
-			
+//			writeData("123");  //以字符串的形式发送。"123"就是 49 50 51
+			uartInterface.SendOneByte((byte) 1); //以字节的形式发送
 			break;
 		default:
 			break;
@@ -399,14 +362,23 @@ public class IatDemo extends Activity implements OnClickListener {
      */
     private SpeechUnderstanderListener mSpeechUnderstanderListener = new SpeechUnderstanderListener() {
 
-		private String urlString;
-		private String text;
 		
+
+    	private String urlString = null;
+    	private String text = null;
 		
+    	private JSONObject root = null;    //获取Json整体对象
+    	private String service = null;     //获取service字段
+    	private JSONObject answer = null;  //获取answer字段
+    	private String answerText = null;  //获取answer字段中的text字段
 
 		@SuppressLint("NewApi")
 		@Override
 		public void onResult(final UnderstanderResult UdrResult) {
+			
+			
+			
+			
 			
 			/*
 			 * 语义分析使用完MIC后，重新启动语音唤醒
@@ -430,37 +402,178 @@ public class IatDemo extends Activity implements OnClickListener {
 				// 显示
 				final String jsonString = UdrResult.getResultString();
 				
-//				mResultText.setText(jsonString);
+				mResultText.setText(jsonString);
 				
 				try {
-					JSONObject root = new JSONObject(jsonString);
 					
+					root = new JSONObject(jsonString);
 					int rc = root.getInt("rc");
-					if(0 == rc){
+					
+				switch (rc) {
+					case 0:
 						
-//						String service = root.getString("service");
-						JSONObject answer = root.getJSONObject("answer");
-						String textString = answer.getString("text");
+						service  = root.getString("service");
+
+						mResultText.setText(service);
 						
-						if(mTextUnderstander.isUnderstanding()){
-							mTextUnderstander.cancel();
-							showTip("取消");
-						}else {
-							ret = mTextUnderstander.understandText(textString, textListener);
-							if(ret != 0)
-							{
-								showTip("语义理解失败,错误码:"+ ret);
+						break;
+						
+					case 1:
+						showTip("无效请求");
+						break;
+						
+					case 2:
+						showTip("服务器内部错误");
+						break;
+						
+					case 3:
+						showTip("业务操作失败");
+						break;
+						
+					case 4:
+						showTip("文本没有匹配的服务场景");
+						
+						break;
+
+					
+					}
+					
+
+				
+				switch (ServiceName.getServiceName(service)) {
+					
+					case openQA://通用问答
+						
+						answer = root.getJSONObject("answer");  //answer Json对象，经语义理解后的回话
+						answerText = answer.getString("text");  //text字段，经语义理解后的回话
+						text = root.getString("text");          //text字段，原话
+						if (text.contains("考考")) {
+							mResultText.setText("考考");
+							if(mTextUnderstander.isUnderstanding()){
+								mTextUnderstander.cancel();
+								showTip("取消");
+							}else {
+								ret = mTextUnderstander.understandText(answerText, textListener);
+								if(ret != 0)
+								{
+									showTip("语义理解失败,错误码:"+ ret);
+								}
 							}
+							
+//							mTts.startSpeaking(answerText, mTtsListener);
+							speechFlag = true;
 						}
 						
-						mResultText.setText(textString);
 						
-						setTtsParam();
-						mTts.startSpeaking(textString, mTtsListener);
-						speechFlag = true;
 						
-					}else{
-						return ;
+//						mResultText.setText(answerText);
+						
+						
+						mTts.startSpeaking(answerText, mTtsListener);
+						
+						
+						break;
+						
+					case calc://计算
+
+						answer = root.getJSONObject("answer");
+						answerText = answer.getString("text");
+						mTts.startSpeaking(answerText, mTtsListener);
+						break;
+						
+					case music://音乐
+						JSONObject data = root.getJSONObject("data");
+					    JSONArray result = data.getJSONArray("result");
+						JSONObject url = result.getJSONObject(0);
+						urlString = url.getString("downloadUrl");
+						mResultText.setText(urlString);
+						if (!TextUtils.isEmpty(urlString)) {
+							lastResultJsonString = jsonString;
+							i = 1;
+							new Thread(new Runnable() {
+	//
+								@Override
+								public void run() {
+										
+									player.playUrl(urlString);
+									
+								}
+							}).start();
+						}
+						break;
+						
+					case weather://天气
+						
+						JSONObject semantic = root.getJSONObject("semantic");  //semantic Json对象，语义理解后返回
+						
+						JSONObject slots = semantic.getJSONObject("slots");
+						//时间
+						JSONObject datetime = slots.getJSONObject("datetime");  //datetime Json对象，语义理解后返回
+						String date = datetime.getString("date");              //date字段，包含时间信息
+						
+						//地点
+						JSONObject location = slots.getJSONObject("location");  //location Json对象，语义理解后返回
+						String city = location.getString("city");              //city字段，包含地点信息
+						
+						if("CURRENT_CITY".equals(city)){
+							
+							mTts.startSpeaking("小朋友，告诉我你在哪个城市？", mTtsListener);
+							speechFlag = true;
+							isWeather = true;
+						
+						}else{
+							
+							//获取天气信息
+							JSONObject weatherData = root.getJSONObject("data");
+							JSONArray weatherResult = weatherData.getJSONArray("result");
+							JSONObject weatherJsonObject = weatherResult.getJSONObject(1);
+							//weather
+							String weather = weatherJsonObject.getString("weather");
+							//wind
+							String wind = weatherJsonObject.getString("wind");
+							//tempRange
+							String tempRange = weatherJsonObject.getString("tempRange");
+							
+							//播报天气
+							mTts.startSpeaking(city+"今天"+weather+","+"风力："+wind+","+"温度"+tempRange, mTtsListener);
+						}
+						
+						break;
+						
+					case baike://百科
+						answer = root.getJSONObject("answer");
+						answerText = answer.getString("text");
+						mTts.startSpeaking(answerText, mTtsListener);
+						
+						break;
+						
+					case datetime://日期
+						answer = root.getJSONObject("answer");
+						answerText = answer.getString("text");
+						mTts.startSpeaking(answerText, mTtsListener);
+						break;
+						
+					case faq://社区问答
+						answer = root.getJSONObject("answer");
+						answerText = answer.getString("text");
+						mTts.startSpeaking(answerText, mTtsListener);
+						break;
+						
+					case chat://聊天
+						answer = root.getJSONObject("answer");
+						answerText = answer.getString("text");
+						mTts.startSpeaking(answerText, mTtsListener);
+						break;
+						
+						
+					case translation://聊天
+						
+						mTts.startSpeaking(answerText, mTtsListener);
+						break;
+
+					default:
+						mTts.startSpeaking("我不理解你的意思，你再说一遍好吗？", mTtsListener);
+						break;
 					}
 					
 					
@@ -468,24 +581,7 @@ public class IatDemo extends Activity implements OnClickListener {
 					
 					
 							
-//					JSONObject data = root.getJSONObject("data");
-//					JSONArray result = data.getJSONArray("result");
-//					JSONObject url = result.getJSONObject(0);
-//					urlString = url.getString("downloadUrl");
-					
-//					if (!TextUtils.isEmpty(urlString)) {
-//						lastResultJsonString = jsonString;
-//						i = 1;
-//						new Thread(new Runnable() {
-//
-//							@Override
-//							public void run() {
-//									
-//								player.playUrl(urlString);
-//								
-//							}
-//						}).start();
-//					}
+
 					
 				} catch (JSONException e) {
 					// TODO Auto-generated catch block
@@ -591,35 +687,100 @@ public class IatDemo extends Activity implements OnClickListener {
 		
 		@Override
 		public void onResult(final UnderstanderResult result) {
+			
 	       	runOnUiThread(new Runnable() {
+					private String textString;
+					private JSONObject answer;
+
 					@Override
 					public void run() {
 						if (null != result) {
 			            	// 显示
 							Log.d(TAG, "understander result：" + result.getResultString());
+							
 							final String text = result.getResultString();
-							if (!TextUtils.isEmpty(text)) {
+									
+							try {
+							JSONObject root = new JSONObject(text);
+							String service = root.getString("service");
+							mResultText.append(service);
+							if ("openQA".equals(service)) {
+								answer = root.getJSONObject("answer");
+								textString = answer.getString("text");	
+								mResultText.append(textString);
+								//向服务器请求题目答案
+								if(mTextUnderstander.isUnderstanding()){
+									mTextUnderstander.cancel();
+									showTip("取消");
+								}else {
+									ret = mTextUnderstander.understandText(textString, textListener);
+									if(ret != 0)
+									{
+										showTip("语义理解失败,错误码:"+ ret);
+									}
+								}
 								
-								try {
-									JSONObject root = new JSONObject(text);
-									JSONObject answer = root.getJSONObject("answer");
-									String textString = answer.getString("text");
-									
-									String regEx="[^0-9]";   
-									Pattern p = Pattern.compile(regEx);   
-									Matcher m = p.matcher(textString);   
-									understandString = m.replaceAll("").trim();
-									
+								setTtsParam();
+								mTts.startSpeaking(textString, mTtsListener);
+								speechFlag = true;
+								
+							}else if("calc".equals(service)){ 
+								answer = root.getJSONObject("answer");
+								textString = answer.getString("text");
+								//从字符串( eg:等于2 )中抽取答案
+								String regEx="[^0-9]";   
+								Pattern p = Pattern.compile(regEx);   
+								Matcher m = p.matcher(textString);   
+								understandString = m.replaceAll("").trim();
+								
+								/*
+								 *   不能在此处，从用户语音中获取答案，因为程序运行到这里的时候，语音合成还未结束
+								 *   所以将 “ 从用户语音中获取答案  ”，的动作放到语音合成结束的回调函数中。
+								 *   
+								 */
+								
+							}else if ("weather".equals(service)) {
+//										
+								//获取城市信息
+								JSONObject semantic = root.getJSONObject("semantic");  //semantic Json对象，语义理解后返回
+								JSONObject slots = semantic.getJSONObject("slots");
+								//地点
+								JSONObject location = slots.getJSONObject("location");  //location Json对象，语义理解后返回
+								String city = location.getString("city");              //city字段，包含地点信息
+								//获取天气信息
+								JSONObject data = root.getJSONObject("data");
+								JSONArray result = data.getJSONArray("result");
+								JSONObject weatherJsonObject = result.getJSONObject(1);
+								//weather
+								String weather = weatherJsonObject.getString("weather");
+								//wind
+								String wind = weatherJsonObject.getString("wind");
+								//tempRange
+								String tempRange = weatherJsonObject.getString("tempRange");
+								
+								//播报天气
+								mTts.startSpeaking(city+"今天"+weather+","+"风力："+wind+","+"温度"+tempRange, mTtsListener);
+								
+								
+								
+							}
+							
+							
+							
+							
 //									understandString = textString.substring(2);
 //									mResultText.append(understandString);
 //									//定位光标到句尾
 //									mResultText.setSelection(mResultText.length());
-								} catch (JSONException e) {
-									// TODO Auto-generated catch block
-									e.printStackTrace();
-								}
+						
 								
 								
+						
+								
+								
+							} catch (JSONException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
 							}
 			            } else {
 			                Log.d(TAG, "understander result:null");
@@ -636,16 +797,16 @@ public class IatDemo extends Activity implements OnClickListener {
 			
 		}
 	};
+
+	protected boolean isWeather = false;
+
+	
     
     
     /**
 	 * 听写监听器。
 	 */
 	private RecognizerListener mRecognizerListener = new RecognizerListener() {
-
-		
-
-		
 
 		@Override
 		public void onBeginOfSpeech() {
@@ -657,7 +818,10 @@ public class IatDemo extends Activity implements OnClickListener {
 		public void onError(SpeechError error) {
 			// Tips：
 			// 错误码：10118(您没有说话)，可能是录音机权限被禁，需要提示用户打开应用的录音权限。
-			showTip(error.getPlainDescription(true));
+			if (error.getPlainDescription(true).contains("10118")) {
+				showTip("您没有说话");
+			}
+			
 		}
 
 		@Override
@@ -695,7 +859,7 @@ public class IatDemo extends Activity implements OnClickListener {
 				String resultString = resultBuffer.toString();
 						
 				mResultText.append(resultString+"\n");
-				
+//				
 				mResultText.append(understandString+"\n");
 				
 				String regEx="[^0-9]";   
@@ -705,19 +869,48 @@ public class IatDemo extends Activity implements OnClickListener {
 				
 				mResultText.append(iatString+"\n");
 				
+				if (resultString.contains("点名")) {
+					
+//					System.out.println("进入点名时间");
+//					mTts.startSpeaking("好的，现在进入点名时间", mTtsListener);
+					
+					new RollCall().start();
+				}
+				
+				
+				if (isWeather) {
+					String local = resultString.substring(0,(resultString.length()-1));
+					isWeather = false;
+					mResultText.append(local+"\n");
+					if(mTextUnderstander.isUnderstanding()){
+						mTextUnderstander.cancel();
+						showTip("取消");
+					}else {
+						ret = mTextUnderstander.understandText(local+"今天天气怎么样？", textListener);
+						
+						if(ret != 0)
+						{
+							showTip("语义理解失败,错误码:"+ ret);
+						}
+					}
+					
+				}
 				
 				if ((iatString != null) && (understandString != null)) {
 					if (iatString.equals(understandString)) {
 						
 						speechFlag = false;
-						mTts.startSpeaking("答对了！", mTtsListener);
-//						mResultText.append("Right!");
-//						
+						uartInterface.SendOneByte((byte) 1); //以字节的形式发送数据到控制板
+						//恭喜你答对了.mp3
+						mTts.startSpeaking("答对了！小主人，你真棒！我再考考你吧！", mTtsListener);
+									
 					}else {
+						uartInterface.SendOneByte((byte) 2); //以字节的形式发送数据到控制板
 						mResultText.append(understandString+"\n");
 						mResultText.append(iatString+"\n");
+						nextQuestionFlag = false;
 						speechFlag = false;
-						mTts.startSpeaking("答错了！", mTtsListener);
+						mTts.startSpeaking("答错了！应该等于"+understandString, mTtsListener);
 					}
 				}
 			}
@@ -829,120 +1022,6 @@ public class IatDemo extends Activity implements OnClickListener {
 //	};
 	
 
-	/*
-	 * 
-	 * 此函数现在已没有使用，保留代码供以后使用
-	 * 
-	 */
-	private void printResult(RecognizerResult results) {
-		String text = JsonParser.parseIatResult(results.getResultString());
-
-		String sn = null;
-		// 读取json结果中的sn字段
-		try {
-			JSONObject resultJson = new JSONObject(results.getResultString());
-			sn = resultJson.optString("sn");
-		} catch (JSONException e) {
-			e.printStackTrace();
-		}
-
-		mIatResults.put(sn, text);
-
-		StringBuffer resultBuffer = new StringBuffer();
-		for (String key : mIatResults.keySet()) {
-			resultBuffer.append(mIatResults.get(key));
-		}
-
-		mResultText.setText(resultBuffer.toString());
-		
-		/*
-		 * 判断是否为特定命令词
-		 * add by Frank
-		 */
-		if( "你好".equals(resultBuffer.toString()) && allowSpeechFalg)
-		{
-			setTtsParam();
-			mTts.startSpeaking("你好，我是机器人瑞宝", mTtsListener);
-			//SendByBT(1);
-			showTip("Forward");
-		}else if( "你会唱歌吗".equals(resultBuffer.toString()) && allowSpeechFalg )
-		{
-			setTtsParam();
-			mTts.startSpeaking("会的，我这就唱给你听呢", mTtsListener);
-			//SendByBT(2);
-			showTip("Backward");
-		}else if( "向前滑行".equals(resultBuffer.toString()) )
-		{
-			//SendByBT(3);
-			showTip("Slide Forward");
-		}else if( "向后滑行".equals(resultBuffer.toString()) )
-		{
-			//SendByBT(4);
-			showTip("Slide Backward");
-		}else if( "停止".equals(resultBuffer.toString())  )
-		{
-			//SendByBT(5);
-			showTip("Stop");
-		}
-		
-		mResultText.setSelection(mResultText.length());
-	}
-
-	/*
-	 * 将命令通过蓝牙发送出去
-	 * add by Frank
-	 */
-	public void SendByBT(int theCmd)
-	{
-		//蓝牙连接输出流
-		switch(theCmd)
-		{
-		case 1:
-			
-			try {
-				OutputStream os = MainActivity._socket.getOutputStream();
-				os.write(c[0]);
-			} catch (IOException e) {} 
-			
-			break;
-			
-		case 2:
-			
-			try {
-				OutputStream os = MainActivity._socket.getOutputStream();
-				os.write(c[1]);
-				
-			} catch (IOException e) {}
-
-			break;
-		case 3:
-			
-			try {
-				OutputStream os = MainActivity._socket.getOutputStream();
-				os.write(c[2]);
-			} catch (IOException e) {}
-			
-			break;
-		case 4:
-			
-			try {
-				OutputStream os = MainActivity._socket.getOutputStream();
-				os.write(c[3]);
-			} catch (IOException e) {}
-			
-			break;
-		case 5:
-			
-			try {
-				OutputStream os = MainActivity._socket.getOutputStream();
-				os.write(c[4]);
-			} catch (IOException e) {}
-			
-			break;
-		}
-	}
-	
-	
 	/**
 	 * 合成回调监听。
 	 */
@@ -984,6 +1063,8 @@ public class IatDemo extends Activity implements OnClickListener {
 				showTip("播放完成");
 				if (speechFlag) {
 					
+					speechFlag = false;
+					
 					//停止语义理解，让出MIC
 					mSpeechUnderstander.stopUnderstanding();
 					
@@ -995,6 +1076,25 @@ public class IatDemo extends Activity implements OnClickListener {
 						showTip(getString(R.string.text_begin));
 					}
 				}
+				
+				
+				//再次出题
+				if (nextQuestionFlag) {
+					
+					nextQuestionFlag = false;
+					//向服务器请求题目
+					if(mTextUnderstander.isUnderstanding()){
+						mTextUnderstander.cancel();
+						showTip("取消");
+					}else {
+						ret = mTextUnderstander.understandText("机器人，考考我吧？", textListener);
+						if(ret != 0)
+						{
+							showTip("语义理解失败,错误码:"+ ret);
+						}
+					}
+				}
+				
 				
 			} else if (error != null) {
 				showTip(error.getPlainDescription(true));
@@ -1082,7 +1182,7 @@ public class IatDemo extends Activity implements OnClickListener {
 				mTts.setParameter(SpeechConstant.EMOT, emot);
 			}
 			//设置合成语速
-			mTts.setParameter(SpeechConstant.SPEED, mSharedPreferences.getString("speed_preference", "50"));
+			mTts.setParameter(SpeechConstant.SPEED, mSharedPreferences.getString("speed_preference", "60"));
 			//设置合成音调
 			mTts.setParameter(SpeechConstant.PITCH, mSharedPreferences.getString("pitch_preference", "50"));
 			//设置合成音量
@@ -1270,12 +1370,9 @@ public class IatDemo extends Activity implements OnClickListener {
 		public void handleMessage(Message msg) {
 			
 			switch (msg.what) {
-			case PROCESSING:
-				mResultText.setText(msg.getData().getString("answer"));
 				
-				break;
-
-			default:
+			case FT312D:
+				
 				for(int i=0; i<actualNumBytes[0]; i++)
 				{
 					readBufferToChar[i] = (char)readBuffer[i];
@@ -1297,6 +1394,10 @@ public class IatDemo extends Activity implements OnClickListener {
 					allowSpeechFalg = false;
 					showTip(s1+"false");
 				}
+				
+				break;
+
+			default:
 				break;
 			}
 			
@@ -1334,7 +1435,9 @@ public class IatDemo extends Activity implements OnClickListener {
 
 				if (status == 0x00 && actualNumBytes[0] > 0) {
 					msg = mHandler.obtainMessage();
+					msg.what = FT312D;
 					mHandler.sendMessage(msg);
+					
 				}
 
 			}

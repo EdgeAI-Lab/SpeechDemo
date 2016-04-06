@@ -12,7 +12,7 @@ public class Player implements OnBufferingUpdateListener, OnCompletionListener ,
 
 	public MediaPlayer mediaPlayer; //媒体播放器
 
-
+	
 	// 初始化播放器
 	public Player() {
 		super();
@@ -32,6 +32,11 @@ public class Player implements OnBufferingUpdateListener, OnCompletionListener ,
 
 	public void play() {
 		mediaPlayer.start();
+	}
+	
+	
+	public Boolean isPlaying(){
+		return mediaPlayer.isPlaying();
 	}
 
 	/**
